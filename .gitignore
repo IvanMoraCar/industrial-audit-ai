@@ -11,3 +11,7 @@ __pycache__/
 # Archivos del sistema operativo
 .DS_Store
 Thumbs.db
+
+# Batch processing folders
+input_docs/
+output_reports/
