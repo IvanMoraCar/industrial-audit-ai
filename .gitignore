@@ -1,0 +1,12 @@
+# Entornos virtuales
+entorno/
+__pycache__/
+
+# Documentos sensibles
+*.pdf
+*.jpg
+*.png
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
