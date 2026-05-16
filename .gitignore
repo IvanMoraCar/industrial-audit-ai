@@ -1,5 +1,6 @@
-# Entornos virtuales
-entorno/
+# Virtual environments
+venv/
+.venv/
 __pycache__/
 
 # Documentos sensibles
