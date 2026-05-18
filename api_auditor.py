@@ -5,32 +5,26 @@ import shutil
 import os
 from datetime import datetime
 
-# Import the core logic engine class
 from core_auditor import DocumentAuditor
 
-# Initialize the application with professional OpenAPI metadata
 app = FastAPI(
     title="Industrial-Audit AI API",
     description="Enterprise-grade B2B API to digitize, read, and audit industrial documents using OCR.",
     version="1.1.0"
 )
 
-# Standardized default paths for binary engines
-POPPLER_PATH = r"C:\poppler\Library\bin"
-TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Hybrid path detection: Use system paths for Linux Cloud, and fallback to C:\ for local Windows
+POPPLER_PATH = r"C:\poppler\Library\bin" if os.name != 'posix' else None
+TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe" if os.name != 'posix' else 'tesseract'
 
-# Initialize global auditor instance
 auditor = DocumentAuditor(POPPLER_PATH, TESSERACT_PATH)
 
-# Directory container for handling stream uploads safely
 TEMP_DIR = "temp_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# Define API Key location configuration inside HTTP Headers
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-# Simulated secure registry mapping active client credentials to subscriptions
 VALID_API_KEYS = {
     "client-alpha-us-9982": "Premium Client - USA Corp",
     "client-beta-mx-4410": "Standard Client - Mexico Factory",
@@ -38,20 +32,12 @@ VALID_API_KEYS = {
 }
 
 def get_api_key(api_key: str = Depends(api_key_header)):
-    """Gatekeeper function executing authorization checks via dependency injection."""
     if not api_key:
-        raise HTTPException(
-            status_code=401, 
-            detail="API Key is missing. Please provide 'X-API-Key' in your request headers."
-        )
+        raise HTTPException(status_code=401, detail="API Key is missing.")
     if api_key not in VALID_API_KEYS:
-        raise HTTPException(
-            status_code=403, 
-            detail="Invalid API Key. Access denied. Please verify your subscription status."
-        )
+        raise HTTPException(status_code=403, detail="Invalid API Key. Access denied.")
     return VALID_API_KEYS[api_key]
 
-# API Service Status Endpoint
 @app.get("/", tags=["Health Check"])
 def read_root(client_name: str = Depends(get_api_key)):
     return {
@@ -60,32 +46,21 @@ def read_root(client_name: str = Depends(get_api_key)):
         "timestamp": datetime.now().isoformat()
     }
 
-# Secure Document Processing Upload Pipeline Endpoint
 @app.post("/api/v1/audit", tags=["Auditor Core"])
-async def audit_document(
-    file: UploadFile = File(...), 
-    client_name: str = Depends(get_api_key)
-):
-    # Enforce strict multi-part type validation filtering for PDF documents
+async def audit_document(file: UploadFile = File(...), client_name: str = Depends(get_api_key)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF files are allowed.")
     
     temp_file_path = os.path.join(TEMP_DIR, file.filename)
-    
     try:
-        # Buffer incoming stream chunks into disk storage
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Invoke core OCR extraction subroutines
         raw_text = auditor.read_pdf(temp_file_path)
-        
         if "Critical error" in raw_text:
             raise Exception(raw_text)
             
         serial_numbers = auditor.extract_data(raw_text)
-        
-        # Build clean JSON structures mapping data schema requirements
         return {
             "filename": file.filename,
             "status": "SUCCESS" if len(serial_numbers) > 0 else "WARNING",
@@ -100,15 +75,13 @@ async def audit_document(
                 "compliance_check": "PASSED" if len(serial_numbers) > 0 else "FAILED"
             }
         }
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal Server Error processing document: {str(e)}")
-        
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
     finally:
-        # Security Guardrail: Force complete deletion of temporary client files
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-# Web Server Lifecycle Entry Point
 if __name__ == "__main__":
-    uvicorn.run("api_auditor:app", host="127.0.0.1", port=8000, reload=True)
+    # Port configuration dynamically bound by Cloud environments or default local 8000
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("api_auditor:app", host="0.0.0.0", port=port, reload=True if os.name != 'posix' else False)
