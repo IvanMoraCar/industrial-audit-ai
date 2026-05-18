@@ -21,7 +21,7 @@ class DocumentAuditor:
             pytesseract.pytesseract.tesseract_cmd = tesseract_path
             
         # Flexible pattern matching industrial SNs or alphanumeric asset tags (8-20 chars)
-        self.serial_pattern = r'\bSN-\d{8}\b|\b(?=[A-Z0-9]*\d)[A-Z0-9]{8,20}\b'
+        self.serial_pattern = r'\bSN-\d{8}\b|\b(?=[a-zA-Z0-9]*\d)[a-zA-Z0-9]{8,20}\b'
 
     def read_pdf(self, pdf_path):
         """Converts the PDF to 300 DPI images and extracts raw text using OCR."""
